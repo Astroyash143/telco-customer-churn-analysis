@@ -1,0 +1,194 @@
+{
+  "name": "Customer Churn Report",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        544,
+        192
+      ],
+      "id": "2198169a-238b-41a6-b5fe-5a9882cc46b6",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LYXpKq7DnPMrS7od",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "01da776d-f669-49ab-86a5-104297e0186d",
+      "name": "Start Churn analysis"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1WmA0lLfqKXLC9OnKIdYBhnpxq7Uu8v8_UBwLq43DjN8",
+          "mode": "list",
+          "cachedResultName": "telco_customer_churn",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1WmA0lLfqKXLC9OnKIdYBhnpxq7Uu8v8_UBwLq43DjN8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 339685394,
+          "mode": "list",
+          "cachedResultName": "Telco-Customer-Churn",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1WmA0lLfqKXLC9OnKIdYBhnpxq7Uu8v8_UBwLq43DjN8/edit#gid=339685394"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "edcac3a6-c6dd-4ca0-a136-e7495a9c27bf",
+      "name": "Fetch Telco Customer Data",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "V9JHyLqr8Qh2fqPp",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst rows = $input.all().map(item => item.json);\n\nconst totalCustomers = rows.length;\nconst churned = rows.filter(r =>\n  String(r.Churn ?? '').trim().toLowerCase() === 'yes'\n);\nconst retained = rows.filter(r =>\n  String(r.Churn ?? '').trim().toLowerCase() === 'no'\n);\n\nconst percent = (n, total) =>\n  total ? Number((n / total * 100).toFixed(2)) : 0;\n\nfunction average(records, field) {\n  const values = records\n    .map(r => Number(r[field]))\n    .filter(v => Number.isFinite(v));\n\n  return values.length\n    ? Number((values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2))\n    : null;\n}\n\nfunction groupByChurn(field) {\n  const groups = {};\n\n  for (const row of rows) {\n    const key = String(row[field] ?? 'Unknown').trim() || 'Unknown';\n\n    if (!groups[key]) {\n      groups[key] = { customers: 0, churned: 0 };\n    }\n\n    groups[key].customers++;\n\n    if (String(row.Churn ?? '').trim().toLowerCase() === 'yes') {\n      groups[key].churned++;\n    }\n  }\n\n  return Object.entries(groups).map(([group, data]) => ({\n    group,\n    customers: data.customers,\n    churned: data.churned,\n    churnRatePct: percent(data.churned, data.customers)\n  }));\n}\n\nconst invalidChurn = rows.filter(r =>\n  !['yes', 'no'].includes(\n    String(r.Churn ?? '').trim().toLowerCase()\n  )\n).length;\n\nreturn [{\n  json: {\n    totalCustomers,\n    churnedCustomers: churned.length,\n    retainedCustomers: retained.length,\n    churnRatePct: percent(churned.length, totalCustomers),\n    averageTenureMonths: average(rows, 'tenure'),\n    averageMonthlyCharges: average(rows, 'MonthlyCharges'),\n    averageTotalCharges: average(rows, 'TotalCharges'),\n    churnByContract: groupByChurn('Contract'),\n    churnByInternetService: groupByChurn('InternetService'),\n    dataQuality: {\n      missingCustomerIDs: rows.filter(r =>\n        !String(r.customerID ?? '').trim()\n      ).length,\n      invalidChurnValues: invalidChurn,\n      missingTotalCharges: rows.filter(r =>\n        String(r.TotalCharges ?? '').trim() === ''\n      ).length\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "61a8deb8-e7e8-4744-929d-1ecdae46be96",
+      "name": "Calculate Churn Metrics"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze this customer churn summary and provide actionable business insights:\n\n{{ JSON.stringify($json) }}",
+        "options": {
+          "systemMessage": "\nYou are a customer churn analyst.\n\nAnalyze the supplied calculated metrics and produce a concise business report.\n\nInclude:\n1. Overall churn situation.\n2. Contract types with the highest churn rates.\n3. Internet service groups with the highest churn rates.\n4. Important patterns in customer tenure and monthly charges, if supported by the data.\n5. Three practical customer-retention actions, prioritized by impact and feasibility.\n6. Data-quality issues that could affect interpretation.\n\nRules:\n- Use only the supplied metrics.\n- Never invent statistics or customer characteristics.\n- Distinguish observed patterns from possible explanations.\n- Do not claim that correlations prove causation.\n- Do not claim to predict individual customer churn.\n- Make recommendations specific and actionable.\n- Clearly mention limitations when evidence is insufficient.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        672,
+        0
+      ],
+      "id": "cae3f221-0359-4c3f-a2f7-0c8d99d35289",
+      "name": "Generative Churn Insights (AI agent)"
+    },
+    {
+      "parameters": {
+        "sendTo": "yy1498324@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.reportHtml }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1072,
+        16
+      ],
+      "id": "a93fdadd-3f60-4e4f-ad34-e4b6badc327f",
+      "name": "Send Churn Report Via Mail",
+      "webhookId": "ba26b394-6dc3-4529-80af-97e7433ddf4e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "8X3N9ll2gZ4CIHmq",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generative Churn Insights (AI agent)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Churn analysis": {
+      "main": [
+        [
+          {
+            "node": "Fetch Telco Customer Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Telco Customer Data": {
+      "main": [
+        [
+          {
+            "node": "Calculate Churn Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Churn Metrics": {
+      "main": [
+        [
+          {
+            "node": "Generative Churn Insights (AI agent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generative Churn Insights (AI agent)": {
+      "main": [
+        [
+          {
+            "node": "Send Churn Report Via Mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "1b2d85f2-ecdb-4c31-8e5b-b62dd29114e1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6b6285f942eaf5e7e1b59cd23c3141ae42d18773610aa92c1ffae7e7bcb1ff34"
+  },
+  "nodeGroups": [],
+  "id": "DrjG5mPXLOYv09Id",
+  "tags": []
+}
