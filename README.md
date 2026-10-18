@@ -1,4 +1,3 @@
-# 🚀 My First AI Automation Workflow — Telco Customer Churn Analysis
 <p align="center">
   <img src="banner.png" alt="Telco Customer Churn Analysis Automation Banner" width="100%">
 </p>
@@ -8,7 +7,7 @@
 </p>
 
 ---
-
+# 🚀 My First AI Automation Workflow — Telco Customer Churn Analysis
 
 Hey everyone! 👋
 
