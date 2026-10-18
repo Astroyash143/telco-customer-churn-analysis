@@ -6,10 +6,6 @@
 <h1 align="center">Telco Customer Churn Analysis Automation</h1>
 
 <p align="center">
-  🚀 My First AI Automation Project | Learning • Building • Growing
-</p>
-
-<p align="center">
   Automating customer churn analysis with n8n, Google Sheets, JavaScript, Google Gemini AI, and Gmail.
 </p>
 
